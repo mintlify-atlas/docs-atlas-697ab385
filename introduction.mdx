@@ -1,0 +1,64 @@
+---
+title: "Introduction"
+description: "greatstorage gives localStorage rich type serialization, TTL-based expiration, namespacing, and schema validation."
+keywords: ["greatstorage", "localStorage", "storage", "serialization", "TTL", "expiration"]
+---
+
+`localStorage` is a key/value store that only speaks strings. Every time you save a `Date`, a `Set`, or a `Map`, you have to remember to serialize it on the way in and reconstruct it on the way out. There is no built-in way to expire stale data, and there is nothing to stop you from reading back a value that no longer matches the shape your code expects.
+
+greatstorage is a thin wrapper around `localStorage` (or any `Storage`-compatible backend) that solves these problems without replacing the familiar API.
+
+## Key features
+
+<Columns cols={2}>
+  <Card title="Rich type serialization" icon="brackets-curly" href="/guides/storing-rich-types">
+    Store and retrieve `Set`, `Map`, `Date`, `RegExp`, `BigInt`, and circular references without any manual conversion.
+  </Card>
+  <Card title="TTL and expiration" icon="clock" href="/guides/ttl-expiration">
+    Attach a time-to-live or an exact expiry timestamp to any entry. Expired values are invisible to reads and can be swept in bulk.
+  </Card>
+  <Card title="Namespacing" icon="folder" href="/guides/namespacing">
+    Use a key prefix to isolate entries by app, environment, or user so different storage instances never collide.
+  </Card>
+  <Card title="Schema validation" icon="shield-check" href="/guides/schema-validation">
+    Pass a Zod schema (or any object with a `parse` method) to validate data on read. Invalid entries return `null` instead of crashing.
+  </Card>
+</Columns>
+
+## How it works
+
+Every value you store is wrapped in an **envelope** before it reaches `localStorage`:
+
+```json
+{
+  "__gs": true,
+  "version": 1,
+  "value": "<serialized value>",
+  "expiry": 1741996800000
+}
+```
+
+- `__gs` and `version` let greatstorage identify its own entries and ignore unrelated keys in the same storage backend.
+- `value` holds the output of the serializer. By default greatstorage uses [devalue](https://github.com/Rich-Harris/devalue), which preserves `Set`, `Map`, `Date`, `RegExp`, `BigInt`, `undefined`, and circular references that `JSON.stringify` would either mangle or throw on.
+- `expiry` is an optional Unix timestamp in milliseconds. When a read finds an expired envelope it removes the entry and returns `null`.
+
+On read, greatstorage unwraps the envelope, checks the expiry, deserializes the value, and optionally validates it against a schema before returning it to you.
+
+<Note>
+  greatstorage only touches entries it created. Keys written directly to `localStorage` by other code are not affected by `clear()` or `clearExpired()`.
+</Note>
+
+## Package exports
+
+greatstorage ships two entry points:
+
+| Import | Description |
+|---|---|
+| `greatstorage` | Main entry point with devalue bundled. Use this for browser apps. |
+| `greatstorage/core` | Core functionality without devalue. You must provide a `serializer` option. Use this to keep bundle size minimal or to supply a custom serializer. |
+
+## Next steps
+
+<Card title="Quickstart" icon="rocket" href="/quickstart">
+  Install greatstorage and go from zero to storing rich types in under five minutes.
+</Card>

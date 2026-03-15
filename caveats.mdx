@@ -1,0 +1,189 @@
+---
+title: "Caveats"
+description: "Known limitations and gotchas to keep in mind when using greatstorage."
+keywords: ["greatstorage", "caveats", "limitations", "gotchas", "localStorage", "null", "serializer", "expiration"]
+---
+
+greatstorage handles a lot of complexity for you, but there are a few behaviors worth understanding before you run into them in production.
+
+<AccordionGroup>
+
+  <Accordion title="Still synchronous storage">
+    greatstorage wraps `localStorage`-style APIs. Every read and write is **synchronous** — the call blocks the main thread until it completes. On most devices with typical data sizes this is imperceptible, but it means:
+
+    - You cannot `await` a `getItem` or `setItem` call.
+    - Storing very large values (multi-megabyte blobs) can cause noticeable jank.
+    - You are still subject to the browser's storage quota (~5 MB in most browsers). Exceeding it throws a `QuotaExceededError`.
+
+    ```typescript
+    // This is synchronous — there is no async version
+    const value = storage.getItem<string>('key');
+    ```
+
+    <Note>
+      If you need async storage (for example, IndexedDB), greatstorage is not the right tool. It is intentionally scoped to `Storage`-compatible backends.
+    </Note>
+  </Accordion>
+
+  <Accordion title="Changing serializers can strand old entries">
+    <Warning>
+      Switching serializers without migrating existing data can make stored entries unreadable.
+    </Warning>
+
+    `getItem` includes a JSON fallback, so single-key reads often recover gracefully. However, enumeration-based APIs — `clear`, `clearExpired`, `key`, and `length` — rely on the current serializer being able to parse every entry in the namespace. If old entries were written with a different serializer, parsing them will fail and those entries may be mishandled.
+
+    The safest migration strategy is to **change the prefix** and start a fresh namespace when you switch serializers:
+
+    ```typescript
+    // Old instance — written with the default devalue serializer
+    const oldStorage = createStorage({ prefix: 'myapp' });
+
+    // New instance — uses a custom superjson serializer
+    const storage = createStorage({
+      prefix: 'myapp-v2',
+      serializer: superjsonSerializer,
+    });
+    ```
+
+    Read any values you want to keep from `oldStorage`, write them to `storage`, then discard `oldStorage`.
+  </Accordion>
+
+  <Accordion title="Expired entries are cleaned up lazily">
+    When an entry's TTL elapses, it is immediately **invisible to reads** — `getItem` returns `null` and `has` returns `false`. However, the underlying bytes may still occupy storage until something triggers removal.
+
+    Removal happens in two ways:
+
+    - `getItem` removes the entry when it finds it expired.
+    - `clearExpired()` sweeps all expired entries in the namespace at once.
+
+    Methods like `has`, `key`, and `length` skip expired entries without removing them. This means stale data can accumulate silently if you never call `getItem` on those keys.
+
+    ```typescript
+    storage.setItem('token', 'abc', { ttl: 1 });
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    // Returns false — entry appears gone
+    console.log(storage.has('token')); // false
+
+    // But the raw bytes are still in localStorage until getItem or clearExpired runs
+    storage.clearExpired(); // removes it now
+    ```
+
+    <Tip>
+      Call `storage.clearExpired()` on app startup to keep storage lean.
+    </Tip>
+  </Accordion>
+
+  <Accordion title="null means several things">
+    <Warning>
+      `getItem` returns `null` for multiple distinct conditions. You cannot tell them apart from the return value alone.
+    </Warning>
+
+    `getItem` returns `null` when any of the following is true:
+
+    | Condition | Explanation |
+    |---|---|
+    | Key does not exist | No entry with that key was found in storage |
+    | Entry is expired | The entry existed but its TTL has elapsed |
+    | Value is a foreign entry | The raw value in `localStorage` was not written by greatstorage |
+    | Parse failure | The serializer could not deserialize the stored bytes |
+    | Schema validation failure | The value did not match the schema passed to `getItem` |
+
+    If your code needs to distinguish between these cases, you have a few options:
+
+    - Use `has()` to check existence before reading.
+    - Check `storage.length` or `storage.key(i)` to enumerate known keys.
+    - Design your stored values so that `null` is not a meaningful state.
+  </Accordion>
+
+  <Accordion title="Stored null and missing keys look the same">
+    If you explicitly store `null` as a value, `getItem` still returns `null` — which is indistinguishable from a missing key.
+
+    ```typescript
+    storage.setItem('flag', null);
+
+    // Both return null
+    console.log(storage.getItem('flag'));       // null
+    console.log(storage.getItem('no-such-key')); // null
+    ```
+
+    <Note>
+      greatstorage logs a development-only warning when you write `null` to remind you of this behavior.
+    </Note>
+
+    If you need to distinguish between a stored `null` and an absent key, pair `getItem` with `has()`:
+
+    ```typescript
+    if (storage.has('flag')) {
+      // Key exists — value may still be null, but the key is present
+      const value = storage.getItem('flag');
+    } else {
+      // Key is absent
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="Existing raw localStorage values are invisible">
+    greatstorage only reads entries that contain its internal `__gs: true` marker. Values written directly to `localStorage` by other code — plain strings, raw JSON, values from other libraries — are completely invisible to `getItem`, `has`, `length`, `key`, and `clear`.
+
+    ```typescript
+    // Written directly — greatstorage cannot see this
+    localStorage.setItem('legacy-key', JSON.stringify({ id: 1 }));
+
+    console.log(storage.getItem('legacy-key')); // null
+    console.log(storage.has('legacy-key'));     // false
+    ```
+
+    To migrate legacy data, read from `localStorage` directly and write through greatstorage. `getOrInit` is a convenient way to do this in one step:
+
+    ```typescript
+    const user = storage.getOrInit('user', () => {
+      // Factory runs only if 'user' is absent from greatstorage
+      const raw = localStorage.getItem('legacy-user-key');
+      return raw ? JSON.parse(raw) : defaultUser;
+    });
+    ```
+  </Accordion>
+
+  <Accordion title="No atomic updates across tabs or callers">
+    <Warning>
+      `getOrInit` and `updateItem` are read-modify-write helpers, not transactions. Concurrent writes from multiple tabs or callers are not safe.
+    </Warning>
+
+    Both methods read the current value, compute a new value, and write it back. If two tabs run the same sequence at the same time, one write will silently overwrite the other.
+
+    ```typescript
+    // Tab A and Tab B both call this simultaneously
+    storage.updateItem<number>('counter', (prev) => (prev ?? 0) + 1);
+    // One increment is lost — the result is 1, not 2
+    ```
+
+    If you need cross-tab coordination, use the [Web Locks API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Locks_API) or the `storage` event to synchronize writes.
+  </Accordion>
+
+  <Accordion title="Schema validation is sync-only and non-destructive">
+    greatstorage's schema validation runs synchronously. If you pass an async schema — an object whose `parse` method returns a `Promise` — greatstorage throws immediately.
+
+    ```typescript
+    const asyncSchema = {
+      parse: async (value: unknown) => value, // async — not allowed
+    };
+
+    // Throws: schema.parse must be synchronous
+    storage.getItem('key', { schema: asyncSchema });
+    ```
+
+    Additionally, when validation fails, greatstorage returns `null` but **does not remove** the stored entry. The value remains in storage and will fail validation again on every subsequent read until you explicitly remove it.
+
+    ```typescript
+    // If the stored shape no longer matches, getItem returns null
+    // but the entry stays in localStorage
+    const user = storage.getItem<User>('currentUser', { schema: UserSchema });
+    if (user === null) {
+      // Remove the stale entry manually if you want to clear it
+      storage.removeItem('currentUser');
+    }
+    ```
+  </Accordion>
+
+</AccordionGroup>

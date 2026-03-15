@@ -1,0 +1,105 @@
+---
+title: "Custom serializer"
+description: "Swap devalue for superjson, plain JSON, or any custom serializer using the serializer option. Use greatstorage/core to tree-shake devalue from your bundle."
+keywords: ["greatstorage", "serializer", "superjson", "devalue", "greatstorage/core", "tree-shaking", "custom serialization"]
+---
+
+By default, greatstorage uses [devalue](https://github.com/Rich-Harris/devalue) to serialize and deserialize values. You can replace devalue with any serializer that implements the `Serializer` interface.
+
+## The Serializer interface
+
+```typescript
+interface Serializer {
+  stringify: (value: unknown) => string;
+  parse: (raw: string) => unknown;
+}
+```
+
+Any object with a `stringify` method and a `parse` method qualifies. `JSON` itself satisfies this interface.
+
+## superjson example
+
+[superjson](https://github.com/blitz-js/superjson) handles the same rich types as devalue — `Date`, `Set`, `Map`, `BigInt`, `RegExp` — with a JSON-compatible output format.
+
+```typescript
+import superjson from 'superjson';
+import { createStorage } from 'greatstorage/core';
+
+const storage = createStorage({
+  prefix: 'myapp',
+  serializer: superjson,
+});
+
+storage.setItem('tags', new Set(['typescript', 'browser']));
+const tags = storage.getItem<Set<string>>('tags');
+console.log(tags instanceof Set); // true
+```
+
+<Note>
+  Use the `greatstorage/core` entry point when providing a custom serializer. It has the same API as `greatstorage` but does not bundle devalue, so you get a smaller build. When using `greatstorage/core`, the `serializer` option is required.
+</Note>
+
+## Plain JSON example
+
+If your stored values are limited to JSON-safe primitives, plain objects, and arrays, you can use `JSON` directly and skip devalue entirely.
+
+```typescript
+import { createStorage } from 'greatstorage/core';
+
+const storage = createStorage({
+  prefix: 'myapp',
+  serializer: JSON,
+});
+
+storage.setItem('count', 42);
+const count = storage.getItem<number>('count');
+console.log(count); // 42
+```
+
+<Warning>
+  Using `JSON` as the serializer means `Date`, `Set`, `Map`, `BigInt`, `RegExp`, `undefined`, `NaN`, and circular references are silently corrupted or will throw — the same limitations as calling `JSON.stringify` directly. Only use `JSON` when you are certain your data will always be JSON-safe.
+</Warning>
+
+## greatstorage/core and tree-shaking
+
+The main `greatstorage` entry point always includes devalue in your bundle. If you supply a custom serializer and want to exclude devalue, import from `greatstorage/core` instead.
+
+```typescript
+// Includes devalue (~5 kB)
+import { createStorage } from 'greatstorage';
+
+// Does not include devalue — serializer is required
+import { createStorage } from 'greatstorage/core';
+```
+
+Both entry points expose the same `createStorage` and `createMemoryStorage` exports. The only difference is that `greatstorage/core` does not bundle devalue and requires you to provide a `serializer`.
+
+## Changing serializers safely
+
+If you switch serializers on a storage instance that already has entries, those existing entries were encoded with the old serializer. Attempting to read them with the new serializer will likely produce garbage or throw.
+
+The safest migration path is to change the `prefix` at the same time you change the `serializer`. This starts you with a clean namespace and leaves old entries untouched — they will expire naturally or you can remove them manually.
+
+```typescript
+// Before: devalue with prefix 'myapp'
+const legacyStorage = createStorage({
+  prefix: 'myapp',
+});
+
+// After: superjson with a new prefix
+const storage = createStorage({
+  prefix: 'myapp-v2',
+  serializer: superjson,
+});
+
+// Optional: migrate specific keys from the old instance
+const theme = legacyStorage.getItem<string>('theme');
+if (theme !== null) {
+  storage.setItem('theme', theme);
+  legacyStorage.removeItem('theme');
+}
+```
+
+<Warning>
+  greatstorage does not automatically fall back to a legacy serializer when reading old entries. If you change the serializer without changing the prefix, reads will silently return `null` for any entry written with the previous serializer.
+</Warning>

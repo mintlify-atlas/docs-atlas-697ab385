@@ -1,0 +1,47 @@
+---
+title: "length"
+description: "The number of non-expired entries in the current namespace."
+keywords: ["greatstorage", "length", "count", "size"]
+---
+
+`length` is a read-only property that returns the count of non-expired entries written by greatstorage in the current namespace.
+
+```typescript
+readonly length: number
+```
+
+<Note>
+  Expired entries are excluded from the count but are **not** removed from storage when you read `length`. Use `clearExpired` to remove them explicitly.
+</Note>
+
+## Return value
+
+Returns a `number` representing the count of non-expired, namespace-scoped entries.
+
+## Example
+
+```typescript
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'myapp' });
+
+console.log(storage.length); // 0
+
+storage.setItem('a', 1);
+storage.setItem('b', 2);
+Storage.setItem('c', 3, { ttl: 1 }); // expires almost immediately
+
+console.log(storage.length); // 3
+
+// After the TTL elapses:
+// length reflects only non-expired entries
+console.log(storage.length); // 2 (expired 'c' is excluded, but not yet removed)
+
+// Combine with key() to iterate over all entries
+for (let i = 0; i < storage.length; i++) {
+  const key = storage.key(i);
+  if (key !== null) {
+    console.log(key, storage.getItem(key));
+  }
+}
+```

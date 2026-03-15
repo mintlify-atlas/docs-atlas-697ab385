@@ -1,0 +1,76 @@
+---
+title: "setItem"
+description: "Store a value in storage with optional TTL or absolute expiration."
+keywords: ["greatstorage", "setItem", "TTL", "expiry", "expiresAt", "expiration"]
+---
+
+`setItem` stores a value under the given key. You can optionally attach an expiration using either `ttl` (a duration in milliseconds) or `expiresAt` (an absolute point in time). The value is wrapped in a greatstorage envelope (`{ __gs: true, version: 1, value, expiry }`) before being serialized and written to the underlying storage backend.
+
+```typescript
+setItem<T = unknown>(key: string, value: T, options?: StorageOptions): void
+```
+
+<Warning>
+  `ttl` and `expiresAt` cannot be used together. Passing both throws a `TypeError`.
+</Warning>
+
+## Parameters
+
+<ParamField path="key" type="string" required>
+  The key to write. The instance prefix and separator are prepended automatically.
+</ParamField>
+
+<ParamField path="value" type="T" required>
+  The value to store. Any value serializable by the configured serializer (devalue by default, which handles `Set`, `Map`, `Date`, `BigInt`, circular references, and more). In non-production environments, storing `null` emits a console warning.
+</ParamField>
+
+<ParamField path="options.ttl" type="number">
+  Time-to-live in milliseconds from the time of the call. Cannot be used with `expiresAt`. In non-production environments, a `ttl` that results in a past expiry emits a console warning.
+</ParamField>
+
+<ParamField path="options.expiresAt" type="Date | number">
+  Absolute expiration as a `Date` object or Unix timestamp in milliseconds. Cannot be used with `ttl`. In non-production environments, a past `expiresAt` emits a console warning.
+</ParamField>
+
+## Examples
+
+### Basic storage
+
+```typescript
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'myapp' });
+
+storage.setItem('user', { name: 'Alice', role: 'admin' });
+storage.setItem('count', 0);
+storage.setItem('tags', new Set(['typescript', 'browser']));
+```
+
+### With TTL
+
+The entry expires after the given number of milliseconds.
+
+```typescript
+// Expires in 5 minutes
+storage.setItem('session', { token: 'abc123' }, { ttl: 5 * 60 * 1000 });
+
+// Expires in 1 hour
+storage.setItem('cache', data, { ttl: 60 * 60 * 1000 });
+```
+
+### With `expiresAt` as a Date
+
+```typescript
+const midnight = new Date();
+midnight.setHours(24, 0, 0, 0);
+
+storage.setItem('dailyQuota', { used: 0, limit: 100 }, { expiresAt: midnight });
+```
+
+### With `expiresAt` as a timestamp
+
+```typescript
+const expiresAt = Date.now() + 30 * 60 * 1000; // 30 minutes from now
+
+storage.setItem('otp', '482910', { expiresAt });
+```

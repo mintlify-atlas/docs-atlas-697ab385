@@ -1,0 +1,51 @@
+---
+title: "key"
+description: "Return the key at a given zero-based index among non-expired entries."
+keywords: ["greatstorage", "key", "index", "iterate", "enumerate"]
+---
+
+`key` returns the key at the given zero-based index within the current namespace, considering only non-expired entries. Returns `null` if the index is out of bounds.
+
+```typescript
+key(index: number): string | null
+```
+
+<Note>
+  Expired entries are skipped when computing the index but are **not** removed from storage. Call `clearExpired` if you want to remove them.
+</Note>
+
+## Parameters
+
+<ParamField path="index" type="number" required>
+  Zero-based index into the list of non-expired keys in the current namespace.
+</ParamField>
+
+## Return value
+
+Returns the key string at that index, or `null` if the index is greater than or equal to `length`.
+
+## Example
+
+```typescript
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'myapp' });
+
+storage.setItem('a', 1);
+storage.setItem('b', 2);
+storage.setItem('c', 3);
+
+console.log(storage.length); // 3
+
+// Iterate over all non-expired keys
+const keys: string[] = [];
+for (let i = 0; i < storage.length; i++) {
+  const k = storage.key(i);
+  if (k !== null) keys.push(k);
+}
+
+console.log(keys); // ['a', 'b', 'c'] (order depends on underlying storage)
+
+// Out-of-bounds returns null
+console.log(storage.key(10)); // null
+```

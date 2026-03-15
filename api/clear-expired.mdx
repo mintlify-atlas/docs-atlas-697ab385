@@ -1,0 +1,43 @@
+---
+title: "clearExpired"
+description: "Remove all expired entries in the current namespace."
+keywords: ["greatstorage", "clearExpired", "cleanup", "TTL", "expiry", "startup"]
+---
+
+`clearExpired` removes every expired entry within the current namespace (prefix). Non-expired entries and entries outside the namespace are not affected.
+
+greatstorage does not remove expired entries automatically in the background. `getItem` removes an expired entry when it reads one, but entries that are never read accumulate over time. Call `clearExpired` proactively — for example on app startup — to reclaim storage space.
+
+```typescript
+clearExpired(): void
+```
+
+## Parameters
+
+None.
+
+## Return value
+
+Void.
+
+## Example
+
+```typescript
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'myapp' });
+
+// Store some short-lived entries
+storage.setItem('otp', '482910', { ttl: 5 * 60 * 1000 });     // 5 minutes
+storage.setItem('cache', { data: [] }, { ttl: 60 * 60 * 1000 }); // 1 hour
+storage.setItem('permanent', { name: 'Alice' });                // no expiry
+
+// ... time passes, 'otp' has expired ...
+
+// On app startup: remove stale entries without touching live ones
+storage.clearExpired();
+
+console.log(storage.has('otp'));       // false — removed
+console.log(storage.has('cache'));     // true  — not yet expired
+console.log(storage.has('permanent')); // true  — no expiry, untouched
+```

@@ -1,0 +1,76 @@
+---
+title: "updateItem"
+description: "Read a value, transform it with an updater function, and write the result back atomically."
+keywords: ["greatstorage", "updateItem", "update", "transform", "increment", "append"]
+---
+
+`updateItem` reads the current value for a key, passes it to an `updater` function, stores the updater's return value, and returns it. If the key is missing or expired, the updater receives `null`.
+
+```typescript
+updateItem<T = unknown>(key: string, updater: (value: T | null) => T, options?: StorageOptions): T
+```
+
+## Parameters
+
+<ParamField path="key" type="string" required>
+  The key to update. The instance prefix and separator are prepended automatically.
+</ParamField>
+
+<ParamField path="updater" type="(value: T | null) => T" required>
+  A function that receives the current value (`T`) or `null` if the key is missing or expired. Its return value is written back to storage and returned from `updateItem`.
+</ParamField>
+
+<ParamField path="options.ttl" type="number">
+  Time-to-live in milliseconds applied to the written value. Cannot be used with `expiresAt`.
+</ParamField>
+
+<ParamField path="options.expiresAt" type="Date | number">
+  Absolute expiration applied to the written value. Cannot be used with `ttl`.
+</ParamField>
+
+## Return value
+
+Returns `T` — the value returned by the updater and written to storage.
+
+## Examples
+
+### Counter increment
+
+```typescript
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'myapp' });
+
+// Increment a counter, starting from 0 if it doesn't exist yet
+const next = storage.updateItem<number>('visitCount', (current) => {
+  return (current ?? 0) + 1;
+});
+
+console.log(next); // 1 on first call, 2 on second, etc.
+```
+
+### Array append
+
+```typescript
+type LogEntry = { message: string; timestamp: number };
+
+const entry: LogEntry = { message: 'User logged in', timestamp: Date.now() };
+
+const log = storage.updateItem<LogEntry[]>('activityLog', (current) => {
+  return [...(current ?? []), entry];
+});
+
+console.log(log.length); // grows with each call
+```
+
+### Object field update
+
+```typescript
+type Preferences = { theme: 'light' | 'dark'; fontSize: number };
+
+// Toggle the theme, defaulting to 'light' if not set
+storage.updateItem<Preferences>('prefs', (current) => ({
+  theme: current?.theme === 'dark' ? 'light' : 'dark',
+  fontSize: current?.fontSize ?? 14,
+}));
+```

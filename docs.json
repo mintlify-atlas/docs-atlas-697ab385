@@ -1,122 +1,82 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
-  "name": "Mint Starter Kit",
+  "name": "greatstorage",
+  "theme": "palm",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#848486",
+    "light": "#15151d",
+    "dark": "#bcbbbc"
   },
-  "favicon": "/favicon.svg",
+  "favicon": "https://media.brand.dev/f5d9e899-6a65-4ce0-8a44-ba32b8ca0332.svg",
+  "logo": {
+    "light": "https://media.brand.dev/b3ced3d7-5a36-4cde-a317-0d1da63e72a6.svg",
+    "dark": "https://media.brand.dev/b3ced3d7-5a36-4cde-a317-0d1da63e72a6.svg"
+  },
+  "navbar": {
+    "primary": {
+      "type": "github",
+      "href": "https://github.com/yangshun/greatstorage"
+    }
+  },
+  "footer": {
+    "socials": {
+      "github": "https://github.com/yangshun/greatstorage"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Documentation",
         "groups": [
           {
-            "group": "Getting started",
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart"]
+          },
+          {
+            "group": "Guides",
             "pages": [
-              "index",
-              "quickstart",
-              "development"
+              "guides/storing-rich-types",
+              "guides/ttl-expiration",
+              "guides/namespacing",
+              "guides/schema-validation",
+              "guides/custom-serializer",
+              "guides/memory-storage"
             ]
           },
           {
-            "group": "Customization",
-            "pages": [
-              "essentials/settings",
-              "essentials/navigation"
-            ]
-          },
-          {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "AI tools",
-            "pages": [
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
-            ]
+            "group": "Resources",
+            "pages": ["caveats", "changelog"]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "API Reference",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Functions",
+            "pages": ["api/create-storage", "api/create-memory-storage"]
+          },
+          {
+            "group": "GreatStorage Instance",
             "pages": [
-              "api-reference/introduction"
+              "api/get-item",
+              "api/set-item",
+              "api/get-or-init",
+              "api/update-item",
+              "api/remove-item",
+              "api/has",
+              "api/key",
+              "api/clear",
+              "api/clear-expired",
+              "api/length"
             ]
           },
           {
-            "group": "Endpoint examples",
-            "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
-            ]
+            "group": "Types",
+            "pages": ["api/types"]
           }
         ]
       }
-    ],
-    "global": {
-      "anchors": [
-        {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
-        },
-        {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
-        }
-      ]
-    }
-  },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
-  "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
-  },
-  "footer": {
-    "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
-    }
+    ]
   }
 }

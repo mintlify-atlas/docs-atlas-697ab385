@@ -1,0 +1,111 @@
+---
+title: "Types"
+description: "TypeScript type definitions exported by greatstorage."
+keywords: ["greatstorage", "types", "TypeScript", "GreatStorage", "StorageOptions", "GetOptions", "Serializer", "CreateStorageOptions", "CoreStorageOptions"]
+---
+
+All types below are exported from `greatstorage` and `greatstorage/core`.
+
+## GreatStorage
+
+`GreatStorage` is the return type of `createStorage`. It extends the standard Web `Storage` interface with additional methods and overloads.
+
+```typescript
+export type GreatStorage = GreatStorageExtensions & Storage;
+
+interface GreatStorageExtensions {
+  readonly length: number;
+  getItem<T>(key: string, options: GetOptions<T>): T | null;
+  getItem<T = unknown>(key: string): T | null;
+  setItem<T = unknown>(key: string, value: T, options?: StorageOptions): void;
+  removeItem(key: string): void;
+  key(index: number): string | null;
+  getOrInit<T>(key: string, factory: () => T, options?: StorageOptions): T;
+  updateItem<T = unknown>(key: string, updater: (value: T | null) => T, options?: StorageOptions): T;
+  clear(): void;
+  clearExpired(): void;
+  has(key: string): boolean;
+}
+```
+
+## CreateStorageOptions
+
+Options accepted by `createStorage` when importing from `greatstorage`. All fields are optional.
+
+```typescript
+export interface CreateStorageOptions {
+  prefix?: string;       // Key prefix for namespacing
+  separator?: string;    // Separator between prefix and key. Defaults to ":"
+  storage?: Storage;     // Underlying Storage backend. Defaults to localStorage
+  serializer?: Serializer; // Custom serializer. Defaults to devalue.
+}
+```
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `prefix` | `string` | — | Namespace prefix prepended to every key. |
+| `separator` | `string` | `":"` | String inserted between the prefix and the key. |
+| `storage` | `Storage` | `localStorage` | The Web Storage backend to write to. |
+| `serializer` | `Serializer` | devalue | Serializer used to encode and decode values. |
+
+## CoreStorageOptions
+
+Options accepted by `createStorage` when importing from `greatstorage/core`. Identical to `CreateStorageOptions` except `serializer` is **required**.
+
+```typescript
+export type CoreStorageOptions = Omit<CreateStorageOptions, 'serializer'> & {
+  serializer: Serializer;
+};
+```
+
+## StorageOptions
+
+Passed as the third argument to `setItem`, `getOrInit`, and `updateItem` to control entry expiration.
+
+```typescript
+export interface StorageOptions {
+  ttl?: number;              // Time-to-live in milliseconds. Cannot be used with expiresAt.
+  expiresAt?: Date | number; // Absolute expiration. Cannot be used with ttl.
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `ttl` | `number` | Duration in milliseconds from the time of the write. |
+| `expiresAt` | `Date \| number` | Absolute expiry as a `Date` or Unix timestamp (ms). |
+
+<Warning>
+  `ttl` and `expiresAt` cannot be used together. Passing both throws a `TypeError`.
+</Warning>
+
+## GetOptions\<T\>
+
+Passed as the second argument to `getItem` to enable runtime schema validation.
+
+```typescript
+export interface GetOptions<T> {
+  schema: StandardSchemaV1<unknown, T>; // Standard Schema to validate against. Must be synchronous.
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `schema` | `StandardSchemaV1<unknown, T>` | A Standard Schema-compatible validator (e.g., a Zod schema). Must be synchronous. If validation fails, `getItem` returns `null`. |
+
+## Serializer
+
+Interface for custom serializers passed via `CreateStorageOptions.serializer` or required by `CoreStorageOptions`.
+
+```typescript
+export interface Serializer {
+  stringify: (value: unknown) => string;
+  parse: (raw: string) => unknown;
+}
+```
+
+| Field | Type | Description |
+|---|---|---|
+| `stringify` | `(value: unknown) => string` | Converts any value to a string for storage. |
+| `parse` | `(raw: string) => unknown` | Converts a string back to a value on retrieval. |
+
+Any library with `stringify` and `parse` methods — such as [devalue](https://github.com/Rich-Harris/devalue), [superjson](https://github.com/blitz-js/superjson), or a custom implementation — satisfies this interface.

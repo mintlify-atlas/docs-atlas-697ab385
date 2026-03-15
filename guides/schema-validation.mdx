@@ -1,0 +1,105 @@
+---
+title: "Schema validation"
+description: "Validate stored data on read using Zod, Valibot, ArkType, or any Standard Schema-compatible library. Invalid entries return null instead of crashing your app."
+keywords: ["greatstorage", "schema validation", "Zod", "Valibot", "ArkType", "Standard Schema", "type safety"]
+---
+
+Browser storage is untrustworthy in two ways: users can edit it with DevTools, and your own code may have stored data in a shape that no longer matches your current type definitions. Reading a value without validating it means your application silently operates on malformed data.
+
+greatstorage accepts a `schema` option on `getItem` that validates the stored value before returning it. Validation failures return `null` — greatstorage never throws on a schema mismatch.
+
+## Standard Schema support
+
+greatstorage uses the [Standard Schema](https://standardschema.dev) interface, so it works with any compliant library: Zod, Valibot, ArkType, and others. You do not need to configure anything — pass the schema directly to `getItem`.
+
+## Zod example
+
+```typescript
+import { z } from 'zod';
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'myapp' });
+
+const UserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  role: z.enum(['admin', 'member']),
+});
+
+type User = z.infer<typeof UserSchema>;
+
+// Store a user object
+storage.setItem<User>('currentUser', {
+  id: 'usr_1',
+  name: 'Alice',
+  role: 'admin',
+});
+
+// Retrieve with validation
+const user = storage.getItem<User>('currentUser', { schema: UserSchema });
+console.log(user?.name); // 'Alice'
+console.log(user?.role); // 'admin'
+```
+
+If someone has manually edited `localStorage` and set `role` to an invalid value, `getItem` returns `null` instead of passing invalid data into your application.
+
+## Valibot example
+
+```typescript
+import * as v from 'valibot';
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'myapp' });
+
+const SettingsSchema = v.object({
+  theme: v.picklist(['light', 'dark', 'system']),
+  fontSize: v.number(),
+});
+
+type Settings = v.InferOutput<typeof SettingsSchema>;
+
+storage.setItem<Settings>('settings', { theme: 'dark', fontSize: 14 });
+
+const settings = storage.getItem<Settings>('settings', { schema: SettingsSchema });
+console.log(settings?.theme); // 'dark'
+```
+
+## When to use schema validation
+
+Schema validation on read is most valuable in these situations:
+
+- **User-editable storage** — DevTools makes it trivial for users to corrupt stored values.
+- **Schema migrations** — When your data shape changes between app versions, old entries may not match the new type. Returning `null` lets you fall back to defaults gracefully.
+- **Shared storage** — When multiple tabs or scripts can write to the same keys.
+- **Persisted state** — Any data that outlives a single page session.
+
+<Tip>
+  If validation is important to your application's correctness, always pass a schema to `getItem`. Without it, greatstorage returns the deserialized value without checking its shape.
+</Tip>
+
+## Validation failure behavior
+
+When a stored value fails schema validation:
+
+- `getItem` returns `null`.
+- The entry is **not removed** from storage. You can inspect or migrate it later.
+- No error is thrown.
+
+```typescript
+// Simulate a corrupted entry
+localStorage.setItem('myapp:settings', JSON.stringify({
+  __gs: true,
+  version: 1,
+  value: '[["theme","invalid-value"]]', // 'invalid-value' is not a valid theme
+  expiry: null,
+}));
+
+const settings = storage.getItem<Settings>('settings', { schema: SettingsSchema });
+console.log(settings); // null — schema failed, but entry is still in localStorage
+```
+
+## Async schemas
+
+<Warning>
+  greatstorage does not support async schemas. If you pass a schema whose `~standard.validate` method returns a Promise, `getItem` throws a `TypeError` immediately. Use synchronous schemas only.
+</Warning>

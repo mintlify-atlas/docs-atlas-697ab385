@@ -1,0 +1,108 @@
+---
+title: "Namespacing"
+description: "Use the prefix option to isolate entries by app, environment, or user so different storage instances never collide."
+keywords: ["greatstorage", "prefix", "namespace", "separator", "key collision", "isolation"]
+---
+
+`localStorage` is shared across everything running on the same origin. If two scripts both write a key called `theme`, they will silently overwrite each other. greatstorage solves this with a `prefix` option that namespaces every key before it reaches `localStorage`.
+
+## Setting a prefix
+
+Pass `prefix` to `createStorage`. Every key you pass to `setItem`, `getItem`, and the other methods is transparently prefixed when written to and read from `localStorage`.
+
+```typescript
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'my-app' });
+
+storage.setItem('theme', 'dark');
+// Written to localStorage as: "my-app:theme"
+```
+
+The prefix and key are joined by a separator. The default separator is `:`.
+
+## Custom separator
+
+If your prefix or keys already contain colons, use the `separator` option to avoid ambiguity.
+
+```typescript
+const storage = createStorage({
+  prefix: 'my-app',
+  separator: '.',
+});
+
+storage.setItem('theme', 'dark');
+// Written to localStorage as: "my-app.theme"
+```
+
+## Isolation between instances
+
+Because each storage instance only operates on keys that match its own prefix, `clear()` and `clearExpired()` do not affect entries from other instances.
+
+```typescript
+const appStorage = createStorage({ prefix: 'app' });
+const cacheStorage = createStorage({ prefix: 'cache' });
+
+appStorage.setItem('user', 'alice');
+cacheStorage.setItem('result', { data: 123 });
+
+// Only removes entries with the "cache:" prefix
+cacheStorage.clear();
+
+// app storage is untouched
+console.log(appStorage.getItem<string>('user')); // 'alice'
+```
+
+## Keys outside the namespace return null
+
+`getItem` only reads entries written by the same storage instance. If a key was written under a different prefix — or written directly to `localStorage` by other code — it is invisible to your greatstorage instance.
+
+```typescript
+// Written directly to localStorage (no greatstorage envelope)
+localStorage.setItem('legacy-theme', 'dark');
+
+const storage = createStorage({ prefix: 'my-app' });
+
+// Returns null — greatstorage only sees "my-app:*" keys
+console.log(storage.getItem<string>('legacy-theme')); // null
+```
+
+## Migrating from plain localStorage keys
+
+If you have existing data written to `localStorage` without a prefix, use `getOrInit` to read it with a fallback, then write it into the namespace.
+
+```typescript
+const storage = createStorage({ prefix: 'my-app' });
+
+// Read the legacy key, migrate it into the namespace
+const theme = storage.getOrInit<string>('theme', () => {
+  const legacy = localStorage.getItem('theme');
+  if (legacy !== null) {
+    localStorage.removeItem('theme'); // clean up the old key
+    return legacy;
+  }
+  return 'system'; // default if no legacy value exists
+});
+
+console.log(theme); // 'dark' (from legacy) or 'system' (default)
+```
+
+## Per-user and per-environment namespaces
+
+Combine a fixed app prefix with a dynamic segment to isolate data per user or environment.
+
+```typescript
+// Per-user storage
+const userStorage = createStorage({ prefix: `myapp:${userId}` });
+
+// Separate caches for staging and production
+const cacheStorage = createStorage({ prefix: `cache:${process.env.NODE_ENV}` });
+```
+
+<Tip>
+  Keep the storage singleton in a shared module and derive the prefix once at startup. Avoid computing prefixes dynamically on every call to `createStorage`.
+</Tip>
+
+<Note>
+  `length` and `key(index)` only count and enumerate entries in the current namespace. They do not see entries from other prefixes or entries written directly to `localStorage`.
+</Note>

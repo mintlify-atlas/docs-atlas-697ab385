@@ -1,80 +1,173 @@
 ---
 title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+description: "Install greatstorage and start storing rich types with expiration in a few minutes."
+keywords: ["greatstorage", "install", "quickstart", "getting started"]
 ---
 
-## Get started in three steps
+<Steps>
 
-Get your documentation site running locally and make your first customization.
+<Step title="Install">
 
-### Step 1: Set up your local environment
+<CodeGroup>
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+```bash npm
+npm install greatstorage
+```
 
-### Step 2: Deploy your changes
+```bash yarn
+yarn add greatstorage
+```
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+```bash pnpm
+pnpm add greatstorage
+```
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+</CodeGroup>
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+</Step>
 
-### Step 3: Go live
+<Step title="Create a storage instance">
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+Create a singleton so you share one configured instance across your app.
+
+```typescript lib/storage.ts
+import { createStorage } from 'greatstorage';
+
+export const storage = createStorage({
+  prefix: 'myapp',
+});
+```
+
+The `prefix` option namespaces every key as `myapp:<key>`, so your entries never collide with other scripts writing to the same `localStorage`.
+
+<Tip>
+  Keep the storage singleton in a dedicated module (e.g. `lib/storage.ts`) and import it wherever you need it. Avoid calling `createStorage` multiple times with the same prefix.
+</Tip>
+
+</Step>
+
+<Step title="Store and retrieve data">
+
+```typescript
+import { storage } from './lib/storage';
+
+// Store a value
+storage.setItem('username', 'alice');
+
+// Retrieve it
+const username = storage.getItem<string>('username');
+console.log(username); // 'alice'
+
+// Returns null if the key does not exist
+const missing = storage.getItem<string>('does-not-exist');
+console.log(missing); // null
+```
+
+`setItem` serializes the value and wraps it in greatstorage's internal envelope. `getItem` unwraps and deserializes on read, returning `null` for missing or expired entries.
+
+</Step>
+
+<Step title="Store rich types">
+
+greatstorage uses [devalue](https://github.com/Rich-Harris/devalue) by default, so `Set`, `Map`, `Date`, `RegExp`, and `BigInt` round-trip correctly without any extra work.
+
+```typescript
+import { storage } from './lib/storage';
+
+// Set
+storage.setItem('tags', new Set(['typescript', 'browser', 'storage']));
+const tags = storage.getItem<Set<string>>('tags');
+console.log(tags instanceof Set); // true
+console.log(tags?.has('typescript')); // true
+
+// Map
+storage.setItem('scores', new Map([['alice', 42], ['bob', 37]]));
+const scores = storage.getItem<Map<string, number>>('scores');
+console.log(scores instanceof Map); // true
+console.log(scores?.get('alice')); // 42
+
+// Date
+storage.setItem('lastSeen', new Date());
+const lastSeen = storage.getItem<Date>('lastSeen');
+console.log(lastSeen instanceof Date); // true
+```
+
+</Step>
+
+<Step title="Add expiration">
+
+Attach a `ttl` (milliseconds from now) or an exact `expiresAt` timestamp to any entry.
+
+```typescript
+import { storage } from './lib/storage';
+
+// Expire after 60 seconds
+storage.setItem('sessionToken', 'abc123', { ttl: 60_000 });
+
+// Expire at a specific time
+storage.setItem('promoCode', 'SAVE20', {
+  expiresAt: new Date('2026-12-31T23:59:59Z'),
+});
+
+// Expired entries return null automatically
+const token = storage.getItem<string>('sessionToken');
+```
+
+When you read an expired entry, greatstorage removes it from storage and returns `null`. You can also sweep all expired entries at once:
+
+```typescript
+storage.clearExpired();
+```
+
+</Step>
+
+<Step title="Add schema validation">
+
+Pass a schema with a `parse` method to validate data on read. [Zod](https://zod.dev) is a natural fit.
+
+```typescript
+import { z } from 'zod';
+import { storage } from './lib/storage';
+
+const UserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  role: z.enum(['admin', 'member']),
+});
+
+type User = z.infer<typeof UserSchema>;
+
+// Store a user object
+storage.setItem<User>('currentUser', {
+  id: 'usr_1',
+  name: 'Alice',
+  role: 'admin',
+});
+
+// Retrieve with validation — returns null if schema fails
+const user = storage.getItem<User>('currentUser', { schema: UserSchema });
+console.log(user?.name); // 'Alice'
+```
+
+If the stored value does not match the schema (for example, because a previous version of your app stored a different shape), `getItem` returns `null` instead of throwing.
+
+</Step>
+
+</Steps>
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
-<CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
-</CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
+<Columns cols={2}>
+  <Card title="Rich type serialization" icon="brackets-curly" href="/guides/storing-rich-types">
+    Learn how devalue handles complex types and how to supply a custom serializer.
+  </Card>
+  <Card title="TTL and expiration" icon="clock" href="/guides/ttl-expiration">
+    Set per-entry TTLs, read expiry metadata, and sweep stale entries.
+  </Card>
+  <Card title="Namespacing" icon="folder" href="/guides/namespacing">
+    Isolate entries by prefix and work with multiple storage instances.
+  </Card>
+  <Card title="Schema validation" icon="shield-check" href="/guides/schema-validation">
+    Validate stored data with Zod or any compatible schema library.
+  </Card>
+</Columns>

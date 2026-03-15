@@ -1,97 +1,82 @@
 ---
-title: "Introduction"
-description: "Welcome to the new home for your documentation"
+title: "greatstorage"
+description: "Gives localStorage superpowers. Handles serialization of rich types, key expiration, namespacing, and schema validation — so you don't have to."
 ---
 
-## Setting up
-
-Get your documentation site up and running in minutes.
-
-<Card
-  title="Start here"
-  icon="rocket"
-  href="/quickstart"
-  horizontal
->
-  Follow our three step quickstart guide.
-</Card>
-
-## Make it yours
-
-Design a docs site that looks great and empowers your users.
-
-<Columns cols={2}>
-  <Card
-    title="Edit locally"
-    icon="pen-to-square"
-    href="/development"
-  >
-    Edit your docs locally and preview them in real time.
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Install greatstorage and store your first value in under two minutes.
   </Card>
-  <Card
-    title="Customize your site"
-    icon="palette"
-    href="/essentials/settings"
-  >
-    Customize the design and colors of your site to match your brand.
+  <Card title="API Reference" icon="code" href="/api/create-storage">
+    Full reference for every method and type exposed by the library.
   </Card>
-    <Card
-    title="Set up navigation"
-    icon="map"
-    href="/essentials/navigation"
-  >
-    Organize your docs to help users find what they need and succeed with your product.
+  <Card title="Guides" icon="book-open" href="/guides/storing-rich-types">
+    Deep dives into rich types, TTL, namespacing, and schema validation.
   </Card>
-  <Card
-    title="API documentation"
-    icon="terminal"
-    href="/api-reference/introduction"
-  >
-    Auto-generate API documentation from OpenAPI specifications.
+  <Card title="GitHub" icon="github" href="https://github.com/yangshun/greatstorage">
+    View source, open issues, and contribute on GitHub.
   </Card>
-</Columns>
+</CardGroup>
 
-## Create beautiful pages
+## Why greatstorage?
 
-Everything you need to create world-class documentation.
+Plain `localStorage` forces you to call `JSON.stringify` and `JSON.parse` everywhere, silently loses `Set`, `Map`, `Date`, and `BigInt` values, and provides no built-in way to expire stale data. greatstorage fixes all of that with a thin, fully typed wrapper that stays out of your way.
 
-<Columns cols={2}>
-  <Card
-    title="Write with MDX"
-    icon="pen-fancy"
-    href="/essentials/markdown"
-  >
-    Use MDX to style your docs pages.
+<CardGroup cols={2}>
+  <Card title="Store anything" icon="box-archive">
+    `Set`, `Map`, `Date`, `RegExp`, `BigInt`, circular references — all handled automatically via [devalue](https://github.com/sveltejs/devalue).
   </Card>
-  <Card
-    title="Code samples"
-    icon="code"
-    href="/essentials/code"
-  >
-    Add sample code to demonstrate how to use your product.
+  <Card title="TTL / expiration" icon="clock">
+    Set a `ttl` in milliseconds or an absolute `expiresAt` timestamp. Expired keys are treated as missing and cleaned up on read.
   </Card>
-  <Card
-    title="Images"
-    icon="image"
-    href="/essentials/images"
-  >
-    Display images and other media.
+  <Card title="Namespacing" icon="folder-tree">
+    Isolate your keys from third-party scripts with a configurable `prefix`. `clear()` only removes entries in your namespace.
   </Card>
-  <Card
-    title="Reusable snippets"
-    icon="recycle"
-    href="/essentials/reusable-snippets"
-  >
-    Write once and reuse across your docs.
+  <Card title="Schema validation" icon="shield-check">
+    Validate values on read with any [Standard Schema](https://github.com/standard-schema/standard-schema)-compatible library — Zod, Valibot, ArkType, and more.
   </Card>
-</Columns>
+  <Card title="Pluggable backends" icon="database">
+    Works with `localStorage`, `sessionStorage`, or any `Storage`-compatible implementation, including an in-memory option for tests and SSR.
+  </Card>
+  <Card title="Tree-shakeable" icon="leaf">
+    Dual ESM/CJS build with full TypeScript types. Import from `greatstorage/core` to exclude `devalue` from your bundle when using a custom serializer.
+  </Card>
+</CardGroup>
 
-## Need inspiration?
+## Quick example
 
-<Card
-  title="See complete examples"
-  icon="stars"
-  href="https://mintlify.com/customers"
->
-  Browse our showcase of exceptional documentation sites.
-</Card>
+```typescript
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'my-app' });
+
+// Store rich types — no JSON.stringify needed
+storage.setItem('tags', new Set(['typescript', 'browser', 'storage']));
+storage.getItem('tags'); // Set {'typescript', 'browser', 'storage'}
+
+// Store with TTL
+storage.setItem('session-token', 'abc123', { ttl: 60_000 }); // expires in 60s
+
+// Schema-validated reads
+import { z } from 'zod';
+const UserSchema = z.object({ name: z.string(), age: z.number() });
+const user = storage.getItem('user', { schema: UserSchema }); // User | null
+```
+
+## Installation
+
+<CodeGroup>
+
+```bash npm
+npm install greatstorage
+```
+
+```bash yarn
+yarn add greatstorage
+```
+
+```bash pnpm
+pnpm add greatstorage
+```
+
+</CodeGroup>

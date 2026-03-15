@@ -1,0 +1,90 @@
+---
+title: "getOrInit"
+description: "Return an existing value or initialize it by calling a factory function."
+keywords: ["greatstorage", "getOrInit", "initialize", "default value", "factory"]
+---
+
+`getOrInit` reads a value from storage. If the key is missing or expired, it calls the provided `factory` function, stores the result, and returns it. The return type is always `T` — never `null`.
+
+```typescript
+getOrInit<T>(key: string, factory: () => T, options?: StorageOptions): T
+```
+
+<Note>
+  If the `factory` function returns `null`, greatstorage stores `null` and will call `factory` again on the next read (because `getItem` returns `null` for missing keys and for stored `null` values alike). In non-production environments, this emits a console warning.
+</Note>
+
+## Parameters
+
+<ParamField path="key" type="string" required>
+  The key to look up and, if absent, to write. The instance prefix and separator are prepended automatically.
+</ParamField>
+
+<ParamField path="factory" type="() => T" required>
+  A function called when the key is missing or expired. Its return value is stored and returned. Avoid returning `null` from the factory — see the note above.
+</ParamField>
+
+<ParamField path="options.ttl" type="number">
+  Time-to-live in milliseconds applied when the factory is called and the value is stored. Has no effect if the key already exists. Cannot be used with `expiresAt`.
+</ParamField>
+
+<ParamField path="options.expiresAt" type="Date | number">
+  Absolute expiration applied when the factory is called and the value is stored. Has no effect if the key already exists. Cannot be used with `ttl`.
+</ParamField>
+
+## Return value
+
+Returns `T`. The factory is called at most once per missing or expired key, and the stored value is returned on subsequent reads without calling the factory again.
+
+## Examples
+
+### User preferences with defaults
+
+```typescript
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'myapp' });
+
+type Preferences = { theme: 'light' | 'dark'; fontSize: number };
+
+// First call — key is missing, factory runs and result is stored
+const prefs = storage.getOrInit<Preferences>('prefs', () => ({
+  theme: 'light',
+  fontSize: 14,
+}));
+
+console.log(prefs.theme); // 'light'
+
+// Second call — key exists, factory is not called
+const same = storage.getOrInit<Preferences>('prefs', () => ({
+  theme: 'dark',
+  fontSize: 16,
+}));
+
+console.log(same.theme); // still 'light'
+```
+
+### Migrating from plain localStorage
+
+`getOrInit` is useful for one-time migration: read a legacy value if it exists, otherwise produce a fresh default.
+
+```typescript
+const storage = createStorage({ prefix: 'myapp' });
+
+const token = storage.getOrInit('authToken', () => {
+  // Fall back to a legacy unmanaged key
+  return localStorage.getItem('legacy_auth_token') ?? '';
+});
+```
+
+### With TTL on initialization
+
+The expiration only applies the first time the factory runs. Subsequent reads return the already-stored value as-is.
+
+```typescript
+const data = storage.getOrInit(
+  'remoteConfig',
+  () => fetchRemoteConfigSync(),
+  { ttl: 10 * 60 * 1000 }, // cache for 10 minutes
+);
+```

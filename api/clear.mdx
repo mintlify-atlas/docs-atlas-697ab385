@@ -1,0 +1,46 @@
+---
+title: "clear"
+description: "Remove all greatstorage entries in the current namespace."
+keywords: ["greatstorage", "clear", "namespace", "prefix", "reset"]
+---
+
+`clear` removes every entry written by greatstorage within the current namespace (prefix). Entries in other namespaces, entries written directly to the underlying storage without greatstorage, and entries belonging to third-party scripts are not affected.
+
+```typescript
+clear(): void
+```
+
+## Parameters
+
+None.
+
+## Return value
+
+Void.
+
+## Example
+
+```typescript
+import { createStorage } from 'greatstorage';
+
+const appStorage = createStorage({ prefix: 'myapp' });
+const cacheStorage = createStorage({ prefix: 'cache' });
+
+appStorage.setItem('user', { name: 'Alice' });
+appStorage.setItem('settings', { theme: 'dark' });
+cacheStorage.setItem('remoteConfig', { featureFlags: [] });
+
+console.log(appStorage.length);   // 2
+console.log(cacheStorage.length); // 1
+
+// Only entries in the 'myapp' namespace are removed
+appStorage.clear();
+
+console.log(appStorage.length);   // 0
+console.log(cacheStorage.length); // 1 — untouched
+
+// Entries written directly to localStorage (without greatstorage) are also untouched
+localStorage.setItem('legacy_key', 'value');
+appStorage.clear();
+console.log(localStorage.getItem('legacy_key')); // 'value' — still there
+```

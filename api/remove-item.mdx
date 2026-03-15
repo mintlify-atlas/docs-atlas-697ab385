@@ -1,0 +1,38 @@
+---
+title: "removeItem"
+description: "Remove a single entry from storage by key."
+keywords: ["greatstorage", "removeItem", "delete", "remove"]
+---
+
+`removeItem` deletes the entry for the given key from the underlying storage backend. If the key does not exist, the call is a no-op.
+
+```typescript
+removeItem(key: string): void
+```
+
+## Parameters
+
+<ParamField path="key" type="string" required>
+  The key to remove. The instance prefix and separator are prepended automatically.
+</ParamField>
+
+## Return value
+
+Void.
+
+## Example
+
+```typescript
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'myapp' });
+
+storage.setItem('session', { token: 'abc123' });
+console.log(storage.has('session')); // true
+
+storage.removeItem('session');
+console.log(storage.has('session')); // false
+
+// Removing a non-existent key is safe
+storage.removeItem('nonexistent'); // no-op, no error
+```

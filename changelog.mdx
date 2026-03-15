@@ -1,0 +1,52 @@
+---
+title: "Changelog"
+description: "A record of all notable changes to greatstorage."
+keywords: ["greatstorage", "changelog", "release notes", "versions"]
+---
+
+## 0.5.0 <span style={{fontSize: '0.875rem', fontWeight: 400, color: 'var(--colors-content-secondary)'}}>— 2026-03-10</span>
+
+greatstorage 0.5.0 focuses on better bundle control for custom serializers and safer development ergonomics.
+
+### Highlights
+
+- Added a new `greatstorage/core` entry point for applications that provide their own serializer and want to avoid bundling `devalue`.
+- Added development-only warnings for two easy-to-miss cases:
+  - Writing `null`, which reads back the same as a missing key via `getItem()`.
+  - Writing values with an expiry that is already in the past.
+- Expanded test coverage for the new core entry point and the warning behavior.
+- Improved the README to document the new entry point and clarify the public API.
+
+### Why `greatstorage/core` exists
+
+The default `greatstorage` entry point still includes `devalue` so rich JavaScript values work out of the box. If you already use a custom serializer such as `superjson`, `greatstorage/core` lets you keep the same storage API while making the serializer explicit and avoiding the extra bundled dependency.
+
+```typescript
+// Default entry point — devalue included, no extra config needed
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'myapp' });
+```
+
+```typescript
+// Core entry point — you supply the serializer
+import { createStorage } from 'greatstorage/core';
+import superjson from 'superjson';
+
+const storage = createStorage({
+  prefix: 'myapp',
+  serializer: {
+    stringify: superjson.stringify,
+    parse: superjson.parse,
+  },
+});
+```
+
+### Upgrade notes
+
+<Note>
+  There are no breaking changes in the default `greatstorage` entry point. Existing code continues to work without modification.
+</Note>
+
+- `greatstorage/core` is new in this release. Its `createStorage()` requires a `serializer` option — omitting it throws a `TypeError`.
+- The new development warnings only run outside production builds (`process.env.NODE_ENV !== 'production'`) and do not change runtime behavior.

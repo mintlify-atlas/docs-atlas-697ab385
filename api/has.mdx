@@ -1,0 +1,49 @@
+---
+title: "has"
+description: "Check whether a key exists in storage and has not expired."
+keywords: ["greatstorage", "has", "exists", "check", "expiry"]
+---
+
+`has` returns `true` if the key exists in the current namespace and the entry has not expired. It returns `false` for missing keys, expired entries, and entries not written by greatstorage.
+
+```typescript
+has(key: string): boolean
+```
+
+<Note>
+  Unlike `getItem`, `has` does **not** remove expired entries from storage. It only checks whether the key is present and valid.
+</Note>
+
+## Parameters
+
+<ParamField path="key" type="string" required>
+  The key to check. The instance prefix and separator are prepended automatically.
+</ParamField>
+
+## Return value
+
+Returns `true` if the key exists and is not expired, `false` otherwise.
+
+## Example
+
+```typescript
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'myapp' });
+
+storage.setItem('user', { name: 'Alice' });
+console.log(storage.has('user')); // true
+
+storage.removeItem('user');
+console.log(storage.has('user')); // false
+
+// Distinguishing has() from getItem() when null is stored
+// getItem returns null for both a missing key and a stored null value.
+// Use has() to tell them apart.
+storage.setItem('nothing', null);
+console.log(storage.getItem('nothing')); // null
+console.log(storage.has('nothing'));     // true  — key exists, value is null
+
+console.log(storage.getItem('missing')); // null
+console.log(storage.has('missing'));     // false — key does not exist
+```

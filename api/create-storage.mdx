@@ -1,0 +1,113 @@
+---
+title: "createStorage"
+description: "Create a GreatStorage instance backed by any Web Storage-compatible backend."
+keywords: ["greatstorage", "createStorage", "localStorage", "sessionStorage", "prefix", "namespace"]
+---
+
+`createStorage` returns a `GreatStorage` instance — a superset of the browser `Storage` interface — with support for TTL expiration, schema validation, and rich types via [devalue](https://github.com/Rich-Harris/devalue).
+
+Import from `greatstorage` to get devalue included automatically. Import from `greatstorage/core` when you want to supply your own serializer and tree-shake devalue out of your bundle (the `serializer` option is required in that case).
+
+```typescript
+// With devalue (default)
+import { createStorage } from 'greatstorage';
+
+// Without devalue — serializer is required
+import { createStorage } from 'greatstorage/core';
+```
+
+## Parameters
+
+<ParamField path="options.prefix" type="string">
+  Key prefix used to namespace all entries written by this instance. Entries from other prefixes and entries not written by greatstorage are never touched by `clear` or `clearExpired`.
+</ParamField>
+
+<ParamField path="options.separator" type="string" default=":">
+  String inserted between the prefix and the key. Defaults to `":"`. Has no effect when `prefix` is not set.
+</ParamField>
+
+<ParamField path="options.storage" type="Storage">
+  Underlying `Storage` backend. Defaults to `localStorage`. Pass `sessionStorage`, a custom `Storage` implementation, or the result of `createMemoryStorage()` to override.
+</ParamField>
+
+<ParamField path="options.serializer" type="Serializer">
+  Custom serializer with `stringify` and `parse` methods. Defaults to devalue when importing from `greatstorage`. Required when importing from `greatstorage/core`.
+</ParamField>
+
+## Return value
+
+Returns a `GreatStorage` object. `GreatStorage` extends the standard `Storage` interface with additional methods (`getOrInit`, `updateItem`, `has`, `clearExpired`) and overloads existing ones (`getItem`, `setItem`) to support TTL, schema validation, and rich types.
+
+## Examples
+
+### Basic usage
+
+```typescript
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage();
+
+storage.setItem('user', { name: 'Alice', role: 'admin' });
+const user = storage.getItem<{ name: string; role: string }>('user');
+console.log(user?.name); // 'Alice'
+```
+
+### With a prefix
+
+Using a prefix isolates your entries from other scripts using the same storage backend. `clear()` only removes entries in the current prefix.
+
+```typescript
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'myapp' });
+
+// Keys are stored as "myapp:user", "myapp:settings", etc.
+storage.setItem('user', { name: 'Alice' });
+storage.setItem('settings', { theme: 'dark' });
+```
+
+### With a custom storage backend
+
+```typescript
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({
+  prefix: 'myapp',
+  storage: sessionStorage,
+});
+
+storage.setItem('session', { token: 'abc123' });
+```
+
+### With a custom serializer
+
+```typescript
+import superjson from 'superjson';
+import { createStorage } from 'greatstorage/core';
+
+const storage = createStorage({
+  prefix: 'myapp',
+  serializer: superjson,
+});
+
+storage.setItem('tags', new Set(['typescript', 'browser']));
+const tags = storage.getItem<Set<string>>('tags');
+console.log(tags instanceof Set); // true
+```
+
+### With the `greatstorage/core` entry point
+
+Use `greatstorage/core` to avoid bundling devalue. You must provide a `serializer`.
+
+```typescript
+import { createStorage } from 'greatstorage/core';
+import * as devalue from 'devalue';
+
+const storage = createStorage({
+  prefix: 'myapp',
+  serializer: {
+    stringify: devalue.stringify,
+    parse: devalue.parse,
+  },
+});
+```

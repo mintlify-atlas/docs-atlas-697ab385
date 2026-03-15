@@ -1,0 +1,69 @@
+---
+title: "createMemoryStorage"
+description: "Create a Map-backed in-memory Storage implementation compatible with the Web Storage API."
+keywords: ["greatstorage", "createMemoryStorage", "SSR", "test", "memory", "in-memory"]
+---
+
+`createMemoryStorage` returns a `Storage`-compatible object backed by a `Map`. It conforms to the Web Storage interface (`getItem`, `setItem`, `removeItem`, `clear`, `key`, `length`) but stores data in memory rather than persisting it across page loads.
+
+```typescript
+import { createMemoryStorage } from 'greatstorage';
+```
+
+## Parameters
+
+None.
+
+## Return value
+
+Returns a `Storage`-compatible object. Pass it as the `storage` option to `createStorage` to create a `GreatStorage` instance that stores data in memory.
+
+## Examples
+
+### SSR-safe pattern
+
+In server-side rendering environments, `localStorage` is not available. Use `createMemoryStorage` as a fallback so your code runs without errors on the server.
+
+```typescript
+import { createStorage, createMemoryStorage } from 'greatstorage';
+
+const isServer = typeof window === 'undefined';
+
+const storage = createStorage({
+  prefix: 'myapp',
+  storage: isServer ? createMemoryStorage() : localStorage,
+});
+
+// Works identically on server and client
+storage.setItem('user', { name: 'Alice' });
+const user = storage.getItem<{ name: string }>('user');
+```
+
+### Test setup
+
+Use `createMemoryStorage` in tests to avoid polluting `localStorage` between test runs and to keep tests deterministic.
+
+```typescript
+import { createStorage, createMemoryStorage } from 'greatstorage';
+
+function createTestStorage() {
+  return createStorage({
+    prefix: 'test',
+    storage: createMemoryStorage(),
+  });
+}
+
+describe('user preferences', () => {
+  let storage: ReturnType<typeof createTestStorage>;
+
+  beforeEach(() => {
+    // Each test gets a fresh, isolated storage instance
+    storage = createTestStorage();
+  });
+
+  it('stores and retrieves a theme preference', () => {
+    storage.setItem('theme', 'dark');
+    expect(storage.getItem<string>('theme')).toBe('dark');
+  });
+});
+```

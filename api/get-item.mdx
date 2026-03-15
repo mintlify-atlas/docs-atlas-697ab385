@@ -1,0 +1,94 @@
+---
+title: "getItem"
+description: "Retrieve a value from storage, with optional schema validation."
+keywords: ["greatstorage", "getItem", "schema", "validation", "Zod", "TTL", "expiry"]
+---
+
+`getItem` retrieves a stored value by key. It comes in two overloads: a generic form that returns `T | null` without validation, and a form that accepts a `GetOptions` object containing a Standard Schema-compatible validator.
+
+```typescript
+// Without schema — returns T | null
+getItem<T = unknown>(key: string): T | null
+
+// With schema — validates the value against the schema
+getItem<T>(key: string, options: GetOptions<T>): T | null
+```
+
+<Note>
+  When you read an expired entry, `getItem` removes it from storage. This is the only method that eagerly removes expired entries. `has`, `key`, and `length` skip expired entries but do not remove them.
+</Note>
+
+## Parameters
+
+<ParamField path="key" type="string" required>
+  The key to look up. The instance prefix and separator are prepended automatically.
+</ParamField>
+
+<ParamField path="options.schema" type="StandardSchemaV1">
+  A Standard Schema-compatible validator (e.g., a Zod schema). Must be synchronous. When provided, the parsed value is validated against the schema. If validation fails, `getItem` returns `null`.
+</ParamField>
+
+## Return value
+
+Returns `T | null`. Returns `null` in any of the following cases:
+
+- The key does not exist in storage.
+- The entry is expired (the entry is also removed from storage).
+- The value was not written by greatstorage (no `__gs` envelope marker).
+- Parsing the stored string fails.
+- Schema validation fails (when `options.schema` is provided).
+
+## Examples
+
+### Basic retrieval
+
+```typescript
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'myapp' });
+
+storage.setItem('count', 42);
+const count = storage.getItem('count');
+console.log(count); // 42
+```
+
+### With a TypeScript generic
+
+Provide a type argument to get a typed return value. greatstorage does not validate the type at runtime in this form — the cast is your responsibility.
+
+```typescript
+type User = { name: string; role: 'admin' | 'user' };
+
+storage.setItem('user', { name: 'Alice', role: 'admin' } satisfies User);
+const user = storage.getItem<User>('user');
+console.log(user?.name); // 'Alice'
+```
+
+### With schema validation (Zod)
+
+Pass a Zod schema in `options.schema` to validate the value at runtime. If the stored value does not match the schema, `getItem` returns `null` instead of throwing.
+
+```typescript
+import { z } from 'zod';
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'myapp' });
+
+const UserSchema = z.object({
+  name: z.string(),
+  role: z.enum(['admin', 'user']),
+});
+
+type User = z.infer<typeof UserSchema>;
+
+storage.setItem('user', { name: 'Alice', role: 'admin' });
+
+const user = storage.getItem('user', { schema: UserSchema });
+// user is User | null — validated at runtime
+console.log(user?.role); // 'admin'
+
+// If the stored value is invalid, getItem returns null
+storage.setItem('user', { name: 'Bob' }); // missing 'role'
+const invalid = storage.getItem('user', { schema: UserSchema });
+console.log(invalid); // null
+```

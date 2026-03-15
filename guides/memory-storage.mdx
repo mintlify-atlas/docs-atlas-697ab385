@@ -1,0 +1,105 @@
+---
+title: "In-memory storage"
+description: "Use createMemoryStorage() as a drop-in localStorage replacement for unit tests and server-side rendering where localStorage is not available."
+keywords: ["greatstorage", "createMemoryStorage", "in-memory", "SSR", "server-side rendering", "unit tests", "vitest", "jest"]
+---
+
+`localStorage` is only available in browser environments. Accessing it during server-side rendering throws a `ReferenceError`, and using it in unit tests means your tests are coupled to a real browser or a partial DOM mock. `createMemoryStorage()` gives you a `Storage`-compatible backend that lives entirely in memory.
+
+## Basic usage
+
+```typescript
+import { createStorage, createMemoryStorage } from 'greatstorage';
+
+const storage = createStorage({
+  prefix: 'myapp',
+  storage: createMemoryStorage(),
+});
+
+storage.setItem('theme', 'dark');
+console.log(storage.getItem<string>('theme')); // 'dark'
+```
+
+The API is identical to a browser-backed instance. All greatstorage features — rich type serialization, TTL, namespacing, schema validation — work the same way.
+
+## SSR-safe pattern
+
+To share one `createStorage` call between server and browser builds, check for `window` at initialization time:
+
+```typescript
+import { createStorage, createMemoryStorage } from 'greatstorage';
+
+export const storage = createStorage({
+  prefix: 'myapp',
+  storage: typeof window === 'undefined' ? createMemoryStorage() : undefined,
+});
+```
+
+Passing `undefined` for `storage` tells greatstorage to use the default — `localStorage` — on the browser. On the server, where `window` is undefined, it falls back to a fresh in-memory store.
+
+<Note>
+  Each call to `createMemoryStorage()` creates an independent, isolated store. In an SSR context each request that creates a new store starts with empty storage, which is usually the correct behavior.
+</Note>
+
+## Unit test setup
+
+Create a fresh memory store for each test so state does not leak between tests.
+
+<CodeGroup>
+
+```typescript vitest
+import { beforeEach, describe, expect, it } from 'vitest';
+import { createStorage, createMemoryStorage } from 'greatstorage';
+
+describe('user preferences', () => {
+  let storage: ReturnType<typeof createStorage>;
+
+  beforeEach(() => {
+    storage = createStorage({
+      prefix: 'test',
+      storage: createMemoryStorage(),
+    });
+  });
+
+  it('stores and retrieves the theme', () => {
+    storage.setItem('theme', 'dark');
+    expect(storage.getItem<string>('theme')).toBe('dark');
+  });
+
+  it('returns null for missing keys', () => {
+    expect(storage.getItem<string>('missing')).toBeNull();
+  });
+});
+```
+
+```typescript jest
+import { createStorage, createMemoryStorage } from 'greatstorage';
+
+describe('user preferences', () => {
+  let storage: ReturnType<typeof createStorage>;
+
+  beforeEach(() => {
+    storage = createStorage({
+      prefix: 'test',
+      storage: createMemoryStorage(),
+    });
+  });
+
+  it('stores and retrieves the theme', () => {
+    storage.setItem('theme', 'dark');
+    expect(storage.getItem<string>('theme')).toBe('dark');
+  });
+
+  it('returns null for missing keys', () => {
+    expect(storage.getItem<string>('missing')).toBeNull();
+  });
+});
+```
+
+</CodeGroup>
+
+## Persistence
+
+<Warning>
+  Data stored in a memory store is not persisted. It is lost when the JavaScript process ends, when the page is reloaded, or when the `storage` object goes out of scope. `createMemoryStorage()` is for ephemeral environments only.
+</Warning>

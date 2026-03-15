@@ -1,0 +1,100 @@
+---
+title: "TTL and expiration"
+description: "Attach a time-to-live or an exact expiry timestamp to any entry. Expired values are invisible to reads and can be swept proactively."
+keywords: ["greatstorage", "TTL", "expiration", "expiresAt", "clearExpired", "lazy cleanup"]
+---
+
+Every entry in greatstorage can carry an optional expiry. Once an entry expires, it behaves as if it does not exist — reads return `null` and the entry is removed from storage on the next read.
+
+## Setting a TTL
+
+Pass `ttl` in milliseconds to `setItem`. The expiry is calculated from the current time when `setItem` is called.
+
+```typescript
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'myapp' });
+
+// Expire after 60 seconds
+storage.setItem('sessionToken', 'abc123', { ttl: 60_000 });
+
+// Expire after 24 hours
+storage.setItem('dashboardCache', data, { ttl: 24 * 60 * 60 * 1000 });
+```
+
+## Setting an exact expiry date
+
+Use `expiresAt` when you know the absolute expiry time rather than a duration. It accepts a `Date` or a Unix timestamp in milliseconds.
+
+<CodeGroup>
+
+```typescript with a Date
+storage.setItem('promoCode', 'SAVE20', {
+  expiresAt: new Date('2026-12-31T23:59:59Z'),
+});
+```
+
+```typescript with a timestamp
+const midnight = new Date();
+midnight.setHours(24, 0, 0, 0);
+
+storage.setItem('promoCode', 'SAVE20', {
+  expiresAt: midnight.getTime(), // milliseconds since epoch
+});
+```
+
+</CodeGroup>
+
+<Warning>
+  You cannot use `ttl` and `expiresAt` together. Passing both throws a `TypeError`.
+</Warning>
+
+## Expired entry behavior
+
+greatstorage uses a **lazy cleanup** strategy. Expired entries are not automatically removed from storage on a timer; they are removed when you try to read them.
+
+| Method | Behavior with expired entries |
+|---|---|
+| `getItem` | Removes the entry and returns `null` |
+| `has` | Returns `false` but does **not** remove the entry |
+| `key(index)` | Skips expired entries but does **not** remove them |
+| `length` | Does **not** count expired entries, does **not** remove them |
+| `clearExpired` | Removes all expired entries |
+
+This means that a stale entry can linger in `localStorage` until something reads it or you call `clearExpired()`.
+
+```typescript
+storage.setItem('token', 'xyz', { ttl: 1 }); // expires in 1 ms
+
+await new Promise(resolve => setTimeout(resolve, 10));
+
+// has() returns false but leaves the entry in localStorage
+console.log(storage.has('token')); // false
+
+// getItem returns null AND removes the entry
+const token = storage.getItem<string>('token');
+console.log(token); // null
+```
+
+## Proactive sweep with clearExpired
+
+Call `clearExpired()` to remove all expired entries in the current namespace at once. This is useful on app startup or in a periodic cleanup routine.
+
+```typescript
+// Remove all stale entries when the app loads
+storage.clearExpired();
+```
+
+`clearExpired()` only affects entries created by this storage instance (entries that match the configured prefix). It does not touch unrelated keys in `localStorage`.
+
+## Entries with no expiry
+
+If you call `setItem` without a `ttl` or `expiresAt`, the entry persists indefinitely — or until you call `removeItem` or `clear()`.
+
+```typescript
+storage.setItem('theme', 'dark'); // no expiry, lives forever
+```
+
+<Note>
+  If you store an entry with an expiry that is already in the past, greatstorage logs a development warning. The entry is written but will be treated as expired immediately on the next read.
+</Note>

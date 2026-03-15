@@ -1,0 +1,149 @@
+---
+title: "Storing rich types"
+description: "greatstorage uses devalue to round-trip Set, Map, Date, RegExp, BigInt, undefined, NaN, and circular references — types that JSON silently corrupts."
+keywords: ["greatstorage", "devalue", "Set", "Map", "Date", "RegExp", "BigInt", "circular reference", "serialization"]
+---
+
+`JSON.stringify` is the default choice for serializing data to a string store, but it silently corrupts many JavaScript values:
+
+- `Date` becomes a plain string — `instanceof Date` is `false` on the way back out.
+- `Set` and `Map` collapse to `{}` with no warning.
+- `undefined` values in objects are dropped entirely.
+- `NaN` and `Infinity` become `null`.
+- `BigInt` throws a `TypeError`.
+- `RegExp` becomes `{}`.
+- Circular references throw a `TypeError`.
+
+greatstorage uses [devalue](https://github.com/Rich-Harris/devalue) as its default serializer. devalue handles all of these cases correctly, so the value you get back is structurally identical to the value you stored.
+
+## Examples
+
+### Set
+
+```typescript
+import { createStorage } from 'greatstorage';
+
+const storage = createStorage({ prefix: 'myapp' });
+
+storage.setItem('tags', new Set(['typescript', 'browser', 'storage']));
+
+const tags = storage.getItem<Set<string>>('tags');
+console.log(tags instanceof Set);        // true
+console.log(tags?.has('typescript'));    // true
+console.log(tags?.size);                // 3
+```
+
+### Map
+
+```typescript
+const scores = new Map<string, number>([
+  ['alice', 42],
+  ['bob', 37],
+]);
+
+storage.setItem('scores', scores);
+
+const retrieved = storage.getItem<Map<string, number>>('scores');
+console.log(retrieved instanceof Map);   // true
+console.log(retrieved?.get('alice'));    // 42
+```
+
+### Date
+
+```typescript
+const now = new Date();
+storage.setItem('lastSeen', now);
+
+const lastSeen = storage.getItem<Date>('lastSeen');
+console.log(lastSeen instanceof Date);   // true
+console.log(lastSeen?.getTime() === now.getTime()); // true
+```
+
+### RegExp
+
+```typescript
+const pattern = /^hello/i;
+storage.setItem('pattern', pattern);
+
+const retrieved = storage.getItem<RegExp>('pattern');
+console.log(retrieved instanceof RegExp);  // true
+console.log(retrieved?.flags);             // 'i'
+console.log(retrieved?.test('Hello'));     // true
+```
+
+### BigInt
+
+```typescript
+const large = BigInt('9007199254740993');
+storage.setItem('largeNumber', large);
+
+const retrieved = storage.getItem<bigint>('largeNumber');
+console.log(typeof retrieved === 'bigint'); // true
+console.log(retrieved === large);           // true
+```
+
+### undefined and NaN
+
+```typescript
+storage.setItem('nothing', undefined);
+const nothing = storage.getItem<undefined>('nothing');
+console.log(nothing === undefined); // true (key exists, value is undefined)
+// Note: getItem returns null for missing keys, not undefined
+// so check storage.has('nothing') to distinguish
+
+storage.setItem('notANumber', NaN);
+const notANumber = storage.getItem<number>('notANumber');
+console.log(Number.isNaN(notANumber)); // true
+```
+
+### Circular references
+
+```typescript
+type Node = { name: string; next?: Node };
+
+const a: Node = { name: 'a' };
+const b: Node = { name: 'b', next: a };
+a.next = b; // circular
+
+storage.setItem('graph', a);
+
+const retrieved = storage.getItem<Node>('graph');
+console.log(retrieved?.name);             // 'a'
+console.log(retrieved?.next?.name);       // 'b'
+console.log(retrieved?.next?.next === retrieved); // true — circularity preserved
+```
+
+## Why JSON silently corrupts data
+
+The JSON specification only represents strings, numbers, booleans, arrays, plain objects, and `null`. When `JSON.stringify` encounters a value outside that set, it does one of three things:
+
+1. **Silently coerces** — `Date` becomes an ISO string, losing its type.
+2. **Silently drops** — `undefined` properties and `Set`/`Map` contents vanish, becoming `{}` or omitted entirely.
+3. **Throws** — `BigInt` and circular references cause a runtime `TypeError`.
+
+None of these failure modes produce a helpful error at the call site; bugs surface later when code expects a `Date` but gets a string, or expects a `Set` but gets an empty object.
+
+devalue avoids these problems by encoding type identity alongside the value, so deserialization can reconstruct the original JavaScript object faithfully.
+
+## Using a custom serializer instead
+
+If you want to keep devalue out of your bundle and use [superjson](https://github.com/blitz-js/superjson) instead, you can swap it in via the `serializer` option:
+
+```typescript
+import superjson from 'superjson';
+import { createStorage } from 'greatstorage/core';
+
+const storage = createStorage({
+  prefix: 'myapp',
+  serializer: superjson,
+});
+
+// The API is identical — superjson handles the same rich types
+storage.setItem('tags', new Set(['typescript']));
+const tags = storage.getItem<Set<string>>('tags');
+console.log(tags instanceof Set); // true
+```
+
+<Note>
+  When you use `greatstorage/core`, the `serializer` option is required — devalue is not bundled. This entry point exists specifically to let you tree-shake devalue and supply your own serializer. See the [custom serializer guide](/guides/custom-serializer) for more detail.
+</Note>
