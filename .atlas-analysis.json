@@ -1,0 +1,89 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "greatstorage",
+  "projectDescription": "A supercharged localStorage wrapper that handles rich type serialization, key expiration (TTL), namespacing, and schema validation via Standard Schema.",
+  "theme": "palm",
+  "primaryColor": "#848486",
+  "lightColor": "#15151d",
+  "darkColor": "#bcbbbc",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart"]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/storing-rich-types",
+              "guides/ttl-expiration",
+              "guides/namespacing",
+              "guides/schema-validation",
+              "guides/custom-serializer",
+              "guides/memory-storage"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": ["caveats", "changelog"]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Functions",
+            "pages": ["api/create-storage", "api/create-memory-storage"]
+          },
+          {
+            "group": "GreatStorage Instance",
+            "pages": [
+              "api/get-item",
+              "api/set-item",
+              "api/get-or-init",
+              "api/update-item",
+              "api/remove-item",
+              "api/has",
+              "api/key",
+              "api/clear",
+              "api/clear-expired",
+              "api/length"
+            ]
+          },
+          {
+            "group": "Types",
+            "pages": ["api/types"]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Rich type serialization (Set, Map, Date, RegExp, BigInt, circular references) via devalue",
+    "TTL / key expiration with lazy cleanup on read",
+    "Namespacing with configurable prefix and separator",
+    "Schema validation on read using any Standard Schema-compatible library (Zod, Valibot, ArkType)",
+    "Pluggable Storage backend (localStorage, sessionStorage, in-memory)",
+    "Custom serializer support with a tree-shakeable greatstorage/core entry point",
+    "Full TypeScript types with ESM and CJS dual builds"
+  ],
+  "publicApiSurface": [
+    "createStorage(options?: CreateStorageOptions): GreatStorage",
+    "createMemoryStorage(): Storage",
+    "GreatStorage.getItem<T>(key, options?): T | null",
+    "GreatStorage.setItem<T>(key, value, options?): void",
+    "GreatStorage.getOrInit<T>(key, factory, options?): T",
+    "GreatStorage.updateItem<T>(key, updater, options?): T",
+    "GreatStorage.removeItem(key): void",
+    "GreatStorage.has(key): boolean",
+    "GreatStorage.key(index): string | null",
+    "GreatStorage.clear(): void",
+    "GreatStorage.clearExpired(): void",
+    "GreatStorage.length: number",
+    "greatstorage/core (createStorage without devalue bundled)"
+  ]
+}
